@@ -110,7 +110,7 @@ Row {data-height=10}
 -----------------------------------------------------------------------
 ### **Fuente de los datos: [Infraestructura Mundial de Información en Biodiversidad (GBIF)](https://www.gbif.org/occurrence/download/0365837-210914110416597)**
 
-Row {data-height=190}
+Row {data-height=140}
 -----------------------------------------------------------------------
 
 ### Registros de presencia {.value-box} {data-width=200}
@@ -158,7 +158,7 @@ valueBox(
 )
 ```
 
-Row {data-height=800}
+Row {data-height=850}
 -----------------------------------------------------------------------
 
 ### Mapa de registros de presencia {data-width=500}
