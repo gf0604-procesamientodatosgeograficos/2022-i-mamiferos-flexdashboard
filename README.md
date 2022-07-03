@@ -1,2 +1,2 @@
-# 2022-i-mamiferos-flexdashboard
-Mamíferos de Costa Rica. Tablero de control desarrollado con flexdashboard.
+# Datos de mamíferos de Costa Rica
+Tablero de control de datos [mamíferos (clase *Mammalia*)](https://es.wikipedia.org/wiki/Mammalia) de Costa Rica, desarrollado con [flexdashboard](https://pkgs.rstudio.com/flexdashboard/).
