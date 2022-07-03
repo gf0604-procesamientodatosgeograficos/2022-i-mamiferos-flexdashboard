@@ -19,11 +19,8 @@ library(leafem) # extensiones para leaflet
 library(flexdashboard) # desarrollo de tableros de control
 ```
 
-```{r entrada-datos}
-# Entrada de datos
-
-
-## Mamíferos
+```{r entrada-datos-mamiferos}
+# Entrada de datos de mamíferos
 
 ### Se usa primero read_delim() para limitar las columnas desde la lectura del archivo
 mamiferos_df <-
@@ -48,54 +45,22 @@ mamiferos_df <-
 ### El data frame se convierte a un objeto sf
 mamiferos <-
   mamiferos_df %>%
-  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
+  st_as_sf(
+    coords = c("decimalLongitude", "decimalLatitude"),
+    remove = FALSE,
+    crs = 4326
+  )
 ```
 
-```{r transformacion-datos}
-# Transformación de datos
+```{r transformacion-datos-mamiferos}
+# Transformación de datos de mamíferos
 
-## Mamíferos
-
-### Filtrado
+## Exclusión de registros con identificación superior a especie
 mamiferos <-
   mamiferos %>%
-  filter(taxonRank == "SPECIES" |
-           taxonRank == "SUBSPECIES") # exclusión de registros con identificación superior a especie
+  filter(taxonRank == "SPECIES" | taxonRank == "SUBSPECIES")
 
-### Órdenes
-ordenes <-
-  mamiferos %>%
-  st_drop_geometry() %>%
-  drop_na(order) %>%
-  group_by(order) %>%
-  summarise(
-    especies = n_distinct(species),
-    registros = n()
-  )
-
-### Familias
-familias <-
-  mamiferos %>%
-  st_drop_geometry() %>%
-  drop_na(family) %>%
-  group_by(family) %>%
-  summarise(
-    especies = n_distinct(species),
-    registros = n()
-  )
-
-### Géneros
-generos <-
-  mamiferos %>%
-  st_drop_geometry() %>%
-  drop_na(genus) %>%
-  group_by(genus) %>%
-  summarise(
-    especies = n_distinct(species),
-    registros = n()
-  )
-
-### Especies
+## Lista de especies
 especies <-
   mamiferos %>%
   st_drop_geometry() %>%
@@ -106,7 +71,7 @@ especies <-
   )
 ```
 
-Resumen
+Generales
 =======================================================================
 
 Row {data-height=10}
@@ -129,7 +94,7 @@ valueBox(
 ```{r resumen-conteo-especies}
 # Especies
 valueBox(
-  value = nrow(especies), 
+  value = n_distinct(mamiferos$species, na.rm = TRUE),
   caption = "Especies"
 )
 ```
@@ -138,7 +103,7 @@ valueBox(
 ```{r resumen-conteo-generos}
 # Géneros
 valueBox(
-  value = nrow(generos), 
+  value = n_distinct(mamiferos$genus, na.rm = TRUE),
   caption = "Géneros"
 )
 ```
@@ -147,7 +112,7 @@ valueBox(
 ```{r resumen-conteo-familias}
 # Familias
 valueBox(
-  value = nrow(familias), 
+  value = n_distinct(mamiferos$family, na.rm = TRUE),
   caption = "Familias"
 )
 ```
@@ -156,7 +121,7 @@ valueBox(
 ```{r resumen-conteo-ordenes}
 # Órdenes
 valueBox(
-  value = nrow(ordenes), 
+  value = n_distinct(mamiferos$order, na.rm = TRUE),
   caption = "Órdenes"
 )
 ```
@@ -164,18 +129,27 @@ valueBox(
 Row {data-height=850}
 -----------------------------------------------------------------------
 
-### Mapa de registros de presencia agrupados {data-width=500}
+### Registros de presencia {data-width=500}
 
 ```{r resumen-mapa-registros-presencia}
 # Mapa de registros de presencia
 
 leaflet() %>%
   addTiles(group = "OpenStreetMap") %>% # capa base de OSM
-  addProviderTiles(provider = providers$Esri.WorldImagery, group = "Imágenes de ESRI") %>%
+  addProviderTiles(provider = providers$Esri.WorldImagery, group = "ESRI World Imagery") %>%
+  addProviderTiles(provider = providers$Stamen.TonerLite, group = "Stamen Toner Lite") %>%
   setView(# centro y nivel inicial de acercamiento
     lng = -84.19452,
     lat = 9.572735,
-    zoom = 7) %>%  
+    zoom = 7) %>%
+  addHeatmap(
+    data = mamiferos,
+    lng = ~decimalLongitude,
+    lat = ~decimalLatitude,
+    radius = 10,
+    blur = 20,
+    group = "Mapa de calor"
+  ) %>%    
   addCircleMarkers( # capa vectorial de puntos de registros de presencia
     data = mamiferos,
     stroke = TRUE,
@@ -197,18 +171,17 @@ leaflet() %>%
     group = "Registros de presencia"
   ) %>%
   addLayersControl(
-    baseGroups = c("OpenStreetMap", "Imágenes de ESRI"),
-    overlayGroups = c(
-      "Registros de presencia"
-    )
+    baseGroups = c("OpenStreetMap", "ESRI World Imagery", "Stamen Toner Lite"),
+    overlayGroups = c("Mapa de calor", "Registros de presencia")
   ) %>%
   addResetMapButton() %>%
   addSearchOSM() %>%
   addMouseCoordinates() %>%
-  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE))
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
+  hideGroup("Mapa de calor")
 ```
 
-### Tabla de especies {data-width=500}
+### Cantidad de registros de presencia por especie {data-width=500}
 
 ```{r resumen-tabla-especies}
 # Tabla de especies
@@ -229,6 +202,8 @@ Tabla de registros de presencia
 
 Row {data-height=1000}
 -----------------------------------------------------------------------
+
+### Tabla de registros de presencia
 
 ```{r registros-tabla-registros-presencia}
 # Tabla de registros de presencia
