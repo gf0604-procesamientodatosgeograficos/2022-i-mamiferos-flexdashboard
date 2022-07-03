@@ -1,0 +1,223 @@
+---
+title: "Datos de mamíferos de Costa Rica"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r paquetes}
+# Paquetes de R
+
+library(readr) # lectura de datos
+library(tidyr) # trasformación de datos
+library(dplyr) # transformación de datos
+library(sf) # manejo de datos geoespaciales vectoriales
+library(DT) # desarrollo de tablas interactivas
+library(leaflet) # desarrollo de mapas interactivos
+library(leaflet.extras) # funcionalidad extra para leaflet
+library(leafem) # extensiones para leaflet
+library(flexdashboard) # desarrollo de tableros de control
+```
+
+```{r entrada-datos}
+# Entrada de datos
+
+
+## Mamíferos
+
+### Se usa primero read_delim() para limitar las columnas desde la lectura del archivo
+mamiferos_df <-
+  read_delim(
+    file = "mamiferos.csv",
+    delim = "\t",
+    col_select = c(
+      "occurrenceID",
+      "order",
+      "family",
+      "genus",
+      "species",
+      "taxonRank",
+      "eventDate",
+      "locality",
+      "institutionCode",
+      "decimalLongitude",
+      "decimalLatitude"
+    )
+  )
+
+### El data frame se convierte a un objeto sf
+mamiferos <-
+  mamiferos_df %>%
+  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
+```
+
+```{r transformacion-datos}
+# Transformación de datos
+
+## Mamíferos
+
+### Filtrado
+mamiferos <-
+  mamiferos %>%
+  filter(taxonRank == "SPECIES" |
+           taxonRank == "SUBSPECIES") # exclusión de registros con identificación superior a especie
+
+### Órdenes
+ordenes <-
+  mamiferos %>%
+  st_drop_geometry() %>%
+  drop_na(order) %>%
+  group_by(order) %>%
+  summarise(
+    especies = n_distinct(species),
+    registros = n()
+  )
+
+### Familias
+familias <-
+  mamiferos %>%
+  st_drop_geometry() %>%
+  drop_na(family) %>%
+  group_by(family) %>%
+  summarise(
+    especies = n_distinct(species),
+    registros = n()
+  )
+
+### Géneros
+generos <-
+  mamiferos %>%
+  st_drop_geometry() %>%
+  drop_na(genus) %>%
+  group_by(genus) %>%
+  summarise(
+    especies = n_distinct(species),
+    registros = n()
+  )
+
+### Especies
+especies <-
+  mamiferos %>%
+  st_drop_geometry() %>%
+  drop_na(species) %>%
+  group_by(species) %>%
+  summarise(
+    registros = n()
+  )
+```
+
+Row {data-height=10}
+-----------------------------------------------------------------------
+### **Fuente de los datos: [Infraestructura Mundial de Información en Biodiversidad (GBIF)](https://www.gbif.org/occurrence/download/0365837-210914110416597)**
+
+Row {data-height=190}
+-----------------------------------------------------------------------
+
+### Registros de presencia {.value-box} {data-width=200}
+```{r resumen-conteo-registros}
+# Registros de presencia
+valueBox(
+  value = nrow(mamiferos), 
+  caption = "Registros de presencia"
+)
+```
+
+### Especies {.value-box} {data-width=200}
+```{r resumen-conteo-especies}
+# Especies
+valueBox(
+  value = nrow(especies), 
+  caption = "Especies"
+)
+```
+
+### Géneros {.value-box} {data-width=200}
+```{r resumen-conteo-generos}
+# Géneros
+valueBox(
+  value = nrow(generos), 
+  caption = "Géneros"
+)
+```
+
+### Familias {.value-box} {data-width=200}
+```{r resumen-conteo-familias}
+# Familias
+valueBox(
+  value = nrow(familias), 
+  caption = "Familias"
+)
+```
+
+### Órdenes {.value-box} {data-width=200}
+```{r resumen-conteo-ordenes}
+# Órdenes
+valueBox(
+  value = nrow(ordenes), 
+  caption = "Órdenes"
+)
+```
+
+Row {data-height=800}
+-----------------------------------------------------------------------
+
+### Mapa de registros de presencia {data-width=500}
+
+```{r resumen-mapa-registros-presencia}
+# Mapa de registros de presencia
+
+leaflet() %>%
+  addTiles(group = "OpenStreetMap") %>% # capa base de OSM
+  addProviderTiles(provider = providers$Esri.WorldImagery, group = "Imágenes de ESRI") %>%
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) %>%  
+  addCircleMarkers( # capa vectorial de puntos de registros de presencia
+    data = mamiferos,
+    stroke = TRUE,
+    radius = 4,
+    color = "black",
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste("<strong>Orden:</strong>", mamiferos$order),
+      paste("<strong>Familia:</strong>", mamiferos$family),
+      paste("<strong>Especie:</strong>", mamiferos$species),
+      paste("<strong>Fecha:</strong>", mamiferos$eventDate),
+      paste("<strong>Localidad:</strong>", mamiferos$locality),
+      paste("<strong>Institución:</strong>", mamiferos$institutionCode),
+      paste("<a href='", mamiferos$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    clusterOptions = markerClusterOptions(),
+    group = "Registros de presencia"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("OpenStreetMap", "Imágenes de ESRI"),
+    overlayGroups = c(
+      "Registros de presencia"
+    )
+  ) %>%
+  addResetMapButton() %>%
+  addSearchOSM() %>%
+  addMouseCoordinates() %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE))
+```
+
+### Tabla de registros de presencia {data-width=500}
+
+```{r resumen-tabla-registros-presencia}
+# Tabla de registros de presencia
+
+mamiferos %>%
+  st_drop_geometry() %>%
+  select(order, family, species, eventDate, locality) %>%
+  datatable(
+    colnames = c("Orden", "Familia", "Especie", "Fecha y hora", "Localidad"),
+    options = list(
+    pageLength = 10,
+    language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+  ))
+```
+
