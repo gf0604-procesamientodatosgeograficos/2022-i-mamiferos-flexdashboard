@@ -100,11 +100,14 @@ especies <-
   mamiferos %>%
   st_drop_geometry() %>%
   drop_na(species) %>%
-  group_by(species) %>%
+  group_by(order, family, genus, species) %>%
   summarise(
     registros = n()
   )
 ```
+
+Resumen
+=======================================================================
 
 Row {data-height=10}
 -----------------------------------------------------------------------
@@ -161,7 +164,7 @@ valueBox(
 Row {data-height=850}
 -----------------------------------------------------------------------
 
-### Mapa de registros de presencia {data-width=500}
+### Mapa de registros de presencia agrupados {data-width=500}
 
 ```{r resumen-mapa-registros-presencia}
 # Mapa de registros de presencia
@@ -205,19 +208,38 @@ leaflet() %>%
   addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE))
 ```
 
-### Tabla de registros de presencia {data-width=500}
+### Tabla de especies {data-width=500}
 
-```{r resumen-tabla-registros-presencia}
-# Tabla de registros de presencia
+```{r resumen-tabla-especies}
+# Tabla de especies
 
-mamiferos %>%
-  st_drop_geometry() %>%
-  select(order, family, species, eventDate, locality) %>%
+especies %>%
+  select(order, family, genus, species, registros) %>%
+  arrange(desc(registros)) %>%
   datatable(
-    colnames = c("Orden", "Familia", "Especie", "Fecha y hora", "Localidad"),
+    colnames = c("Orden", "Familia", "Género", "Especie", "Registros"),
     options = list(
     pageLength = 10,
     language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
   ))
 ```
 
+Tabla de registros de presencia
+=======================================================================
+
+Row {data-height=1000}
+-----------------------------------------------------------------------
+
+```{r registros-tabla-registros-presencia}
+# Tabla de registros de presencia
+
+mamiferos %>%
+  st_drop_geometry() %>%
+  select(order, family, genus, species, eventDate, locality) %>%
+  datatable(
+    colnames = c("Orden", "Familia", "Género", "Especie", "Fecha y hora", "Localidad"),
+    options = list(
+    pageLength = 10,
+    language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+  ))
+```
