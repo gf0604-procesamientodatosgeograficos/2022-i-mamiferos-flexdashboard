@@ -13,7 +13,7 @@ library(tidyr) # trasformación de datos
 library(dplyr) # transformación de datos
 library(sf) # manejo de datos geoespaciales vectoriales
 library(DT) # desarrollo de tablas interactivas
-library(ggplot2) # desarrollo de gráficos declarativos
+library(ggplot2) # desarrollo declarativo de gráficos
 library(plotly) # desarrollo de gráficos interactivos
 library(leaflet) # desarrollo de mapas interactivos
 library(leaflet.extras) # funcionalidad extra para leaflet
@@ -175,7 +175,7 @@ valueBox(
 Row {data-height=850}
 -----------------------------------------------------------------------
 
-### Registros de presencia {data-width=500}
+### Mapa de registros de presencia {data-width=500}
 
 ```{r generales-mapa-registros-presencia}
 # Mapa de registros de presencia
@@ -227,7 +227,7 @@ leaflet() %>%
   hideGroup("Mapa de calor")
 ```
 
-### Registros por especie {data-width=500}
+### Tabla de registros por especie {data-width=500}
 
 ```{r generales-tabla-registros-x-especie}
 # Tabla de especies
@@ -247,7 +247,7 @@ especies %>%
 Distribución en provincias
 =======================================================================
 
-Row {data-height=700}
+Row {data-height=650}
 -----------------------------------------------------------------------
 
 ### Mapa
@@ -378,13 +378,13 @@ provincias_mamiferos %>%
   ))
 ```
 
-Row {data-height=300}
+Row {data-height=350}
 -----------------------------------------------------------------------
 
-### Gráfico
+### Gráfico de distribución de especies en provincias
 
-```{r distribucion-provincias-grafico}
-# Gráfico de distribución en provincias
+```{r distribucion-provincias-especies-grafico}
+# Gráfico de distribución de especies en provincias
 
 # Gráfico ggplot2
 grafico_distribucion_provincias_especies <-
@@ -397,6 +397,26 @@ grafico_distribucion_provincias_especies <-
 
 # Gráfico plotly
 grafico_distribucion_provincias_especies %>%
+  ggplotly() %>%
+  config(locale = 'es') # traducción de etiquetas al español
+```
+
+### Gráfico de distribución de registros en provincias
+
+```{r distribucion-provincias-registros-grafico}
+# Gráfico de distribución de registros en provincias
+
+# Gráfico ggplot2
+grafico_distribucion_provincias_registros <-
+  provincias_mamiferos %>%
+  st_drop_geometry() %>%
+  ggplot(aes(x = reorder(provincia, -registros), y = registros)) +
+  geom_bar(stat = "identity", fill = "red") +
+  xlab("Provincia") +
+  ylab("Registros")
+
+# Gráfico plotly
+grafico_distribucion_provincias_registros %>%
   ggplotly() %>%
   config(locale = 'es') # traducción de etiquetas al español
 ```
