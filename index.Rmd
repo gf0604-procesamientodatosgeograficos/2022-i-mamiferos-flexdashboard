@@ -13,16 +13,29 @@ library(tidyr) # trasformación de datos
 library(dplyr) # transformación de datos
 library(sf) # manejo de datos geoespaciales vectoriales
 library(DT) # desarrollo de tablas interactivas
+library(ggplot2) # desarrollo de gráficos declarativos
+library(plotly) # desarrollo de gráficos interactivos
 library(leaflet) # desarrollo de mapas interactivos
 library(leaflet.extras) # funcionalidad extra para leaflet
 library(leafem) # extensiones para leaflet
 library(flexdashboard) # desarrollo de tableros de control
 ```
 
-```{r entrada-datos-mamiferos}
+```{r entrada-datos-provincias}
+# Entrada de datos de provincias
+
+provincias <-
+  st_read(
+    dsn = "provincias_simplificadas.geojson",
+    quiet = TRUE
+  ) %>%
+  st_transform(4326) # transformación a WGS84
+```
+
+```{r entrada-transformacion-datos-mamiferos}
 # Entrada de datos de mamíferos
 
-### Se usa primero read_delim() para limitar las columnas desde la lectura del archivo
+## Se usa primero read_delim() para limitar las columnas desde la lectura del archivo
 mamiferos_df <-
   read_delim(
     file = "mamiferos.csv",
@@ -42,7 +55,7 @@ mamiferos_df <-
     )
   )
 
-### El data frame se convierte a un objeto sf
+## El data frame se convierte a un objeto sf
 mamiferos <-
   mamiferos_df %>%
   st_as_sf(
@@ -50,17 +63,13 @@ mamiferos <-
     remove = FALSE,
     crs = 4326
   )
-```
 
-```{r transformacion-datos-mamiferos}
-# Transformación de datos de mamíferos
-
-## Exclusión de registros con identificación superior a especie
+# Exclusión de registros con identificación superior a especie
 mamiferos <-
   mamiferos %>%
   filter(taxonRank == "SPECIES" | taxonRank == "SUBSPECIES")
 
-## Lista de especies
+# Lista de especies
 especies <-
   mamiferos %>%
   st_drop_geometry() %>%
@@ -69,6 +78,43 @@ especies <-
   summarise(
     registros = n()
   )
+
+# Mamíferos - provincias
+
+## Unión de mamiferos y provincias a través st_join()
+mamiferos <- 
+  mamiferos %>%
+  st_join(provincias[c("cod_provin", "provincia")])
+
+## Conteo de especies y registros por código de provincia
+mamiferos_x_provincia <-
+  mamiferos %>%
+  st_drop_geometry() %>%
+  group_by(cod_provin) %>%
+  summarise(especies = n_distinct(species, na.rm = TRUE),
+            registros = n())
+
+## Unión de especies y registros por provincia a provincias
+provincias_mamiferos <-
+  provincias %>%
+  left_join(
+    mamiferos_x_provincia,
+    by = "cod_provin",
+    copy = FALSE,
+    keep = FALSE
+  )
+
+## Paleta de colores para la columna de especies
+colores_provincias_mamiferos_especies <-
+  colorNumeric(palette = "Blues",
+               domain = provincias_mamiferos$especies,
+               na.color = "transparent")
+
+## Paleta de colores para la columna de registros
+colores_provincias_mamiferos_registros <-
+  colorNumeric(palette = "Reds",
+               domain = provincias_mamiferos$registros,
+               na.color = "transparent")
 ```
 
 Generales
@@ -82,7 +128,7 @@ Row {data-height=140}
 -----------------------------------------------------------------------
 
 ### Registros de presencia {.value-box} {data-width=200}
-```{r resumen-conteo-registros}
+```{r generales-conteo-registros}
 # Registros de presencia
 valueBox(
   value = nrow(mamiferos), 
@@ -91,7 +137,7 @@ valueBox(
 ```
 
 ### Especies {.value-box} {data-width=200}
-```{r resumen-conteo-especies}
+```{r generales-conteo-especies}
 # Especies
 valueBox(
   value = n_distinct(mamiferos$species, na.rm = TRUE),
@@ -100,7 +146,7 @@ valueBox(
 ```
 
 ### Géneros {.value-box} {data-width=200}
-```{r resumen-conteo-generos}
+```{r generales-conteo-generos}
 # Géneros
 valueBox(
   value = n_distinct(mamiferos$genus, na.rm = TRUE),
@@ -109,7 +155,7 @@ valueBox(
 ```
 
 ### Familias {.value-box} {data-width=200}
-```{r resumen-conteo-familias}
+```{r generales-conteo-familias}
 # Familias
 valueBox(
   value = n_distinct(mamiferos$family, na.rm = TRUE),
@@ -118,7 +164,7 @@ valueBox(
 ```
 
 ### Órdenes {.value-box} {data-width=200}
-```{r resumen-conteo-ordenes}
+```{r generales-conteo-ordenes}
 # Órdenes
 valueBox(
   value = n_distinct(mamiferos$order, na.rm = TRUE),
@@ -131,7 +177,7 @@ Row {data-height=850}
 
 ### Registros de presencia {data-width=500}
 
-```{r resumen-mapa-registros-presencia}
+```{r generales-mapa-registros-presencia}
 # Mapa de registros de presencia
 
 leaflet() %>%
@@ -181,9 +227,9 @@ leaflet() %>%
   hideGroup("Mapa de calor")
 ```
 
-### Cantidad de registros de presencia por especie {data-width=500}
+### Registros por especie {data-width=500}
 
-```{r resumen-tabla-especies}
+```{r generales-tabla-registros-x-especie}
 # Tabla de especies
 
 especies %>%
@@ -197,24 +243,160 @@ especies %>%
   ))
 ```
 
-Tabla de registros de presencia
+
+Distribución en provincias
 =======================================================================
 
-Row {data-height=1000}
+Row {data-height=700}
 -----------------------------------------------------------------------
 
-### Tabla de registros de presencia
+### Mapa
 
-```{r registros-tabla-registros-presencia}
-# Tabla de registros de presencia
+```{r distribucion-provincias-mapa}
+# Mapa de distribución en provincias
 
-mamiferos %>%
+leaflet() %>%
+  addTiles(group = "OpenStreetMap") %>% # capa base de OSM
+  addProviderTiles(provider = providers$Esri.WorldImagery, group = "ESRI World Imagery") %>%
+  addProviderTiles(provider = providers$Stamen.TonerLite, group = "Stamen Toner Lite") %>%
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) %>%
+  addPolygons(
+    data = provincias_mamiferos,
+    fillColor = ~ colores_provincias_mamiferos_especies(provincias_mamiferos$especies),
+    fillOpacity = 0.8,
+    color = "black",
+    stroke = TRUE,
+    weight = 1.0,
+    popup = paste(
+      paste(
+        "<strong>Provincia:</strong>",
+        provincias_mamiferos$provincia
+      ),
+      paste("<strong>Especies:</strong>",
+            provincias_mamiferos$especies),
+      sep = '<br/>'
+    ),
+    group = "Cantidad de especies"
+  ) %>%
+  addPolygons(
+    data = provincias_mamiferos,
+    fillColor = ~ colores_provincias_mamiferos_registros(provincias_mamiferos$registros),
+    fillOpacity = 0.8,
+    color = "black",
+    stroke = TRUE,
+    weight = 1.0,
+    popup = paste(
+      paste(
+        "<strong>Provincia:</strong>",
+        provincias_mamiferos$provincia
+      ),
+      paste(
+        "<strong>Registros:</strong>",
+        provincias_mamiferos$registros
+      ),
+      sep = '<br/>'
+    ),
+    group = "Cantidad de registros"
+  ) %>%
+  addHeatmap(
+    data = mamiferos,
+    lng = ~ decimalLongitude,
+    lat = ~ decimalLatitude,
+    radius = 10,
+    blur = 20,
+    group = "Mapa de calor"
+  ) %>%
+  addCircleMarkers(
+    # capa vectorial de puntos de registros de presencia
+    data = mamiferos,
+    stroke = TRUE,
+    radius = 4,
+    color = "black",
+    fillColor = 'red',
+    fillOpacity = 1,
+    popup = paste(
+      paste("<strong>Orden:</strong>", mamiferos$order),
+      paste("<strong>Familia:</strong>", mamiferos$family),
+      paste("<strong>Especie:</strong>", mamiferos$species),
+      paste("<strong>Fecha:</strong>", mamiferos$eventDate),
+      paste("<strong>Localidad:</strong>", mamiferos$locality),
+      paste("<strong>Institución:</strong>", mamiferos$institutionCode),
+      paste("<a href='", mamiferos$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    clusterOptions = markerClusterOptions(),
+    group = "Registros de presencia"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("OpenStreetMap", "ESRI World Imagery", "Stamen Toner Lite"),
+    overlayGroups = c(
+      "Cantidad de especies",
+      "Cantidad de registros",
+      "Mapa de calor",
+      "Registros de presencia"
+    )
+  ) %>%
+  addLegend(
+    position = "bottomleft",
+    pal = colores_provincias_mamiferos_especies,
+    values = provincias_mamiferos$especies,
+    group = "Cantidad de especies",
+    title = "Cantidad de especies"
+  )  %>%
+  addLegend(
+    position = "bottomleft",
+    pal = colores_provincias_mamiferos_registros,
+    values = provincias_mamiferos$registros,
+    group = "Cantidad de registros",
+    title = "Cantidad de registros"
+  )  %>%
+  addResetMapButton() %>%
+  addSearchOSM() %>%
+  addMouseCoordinates() %>%
+  addScaleBar(position = "bottomright", options = scaleBarOptions(imperial = FALSE)) %>%
+  hideGroup("Cantidad de registros") %>%
+  hideGroup("Mapa de calor")
+```
+
+### Tabla
+
+```{r distribucion-provincias-tabla}
+# Tabla de distribución en provincias
+
+provincias_mamiferos %>%
   st_drop_geometry() %>%
-  select(order, family, genus, species, eventDate, locality) %>%
+  select(provincia, especies, registros) %>%
+  arrange(desc(especies)) %>%
   datatable(
-    colnames = c("Orden", "Familia", "Género", "Especie", "Fecha y hora", "Localidad"),
+    colnames = c("Provincia", "Especies", "Registros de presencia"),
     options = list(
-    pageLength = 10,
+    pageLength = 7,
     language = list(url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
   ))
+```
+
+Row {data-height=300}
+-----------------------------------------------------------------------
+
+### Gráfico
+
+```{r distribucion-provincias-grafico}
+# Gráfico de distribución en provincias
+
+# Gráfico ggplot2
+grafico_distribucion_provincias_especies <-
+  provincias_mamiferos %>%
+  st_drop_geometry() %>%
+  ggplot(aes(x = reorder(provincia, -especies), y = especies)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  xlab("Provincia") +
+  ylab("Especies")
+
+# Gráfico plotly
+grafico_distribucion_provincias_especies %>%
+  ggplotly() %>%
+  config(locale = 'es') # traducción de etiquetas al español
 ```
